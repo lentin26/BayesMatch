@@ -124,8 +124,8 @@ if __name__ == '__main__':
 
     # generate random dataset
     n = 50
-    cj = np.random.randint(0, 10, size=1000).reshape(100, 10)
-    cm = np.random.randint(5, 15, size=1000).reshape(100, 10)
+    cj = np.random.randint(0, 10, size=1000).reshape(200, 5)
+    cm = np.random.randint(5, 15, size=1000).reshape(200, 5)
 
     # initialize matching algorithm
     match = BayesMatch(
