@@ -1,7 +1,7 @@
 import numpy as np
 from numpy.random import multinomial, randint, choice
 from scipy.special import psi
-from BayesMatchBase import BayesMatchBase
+from BayesMatch import BayesMatchBase
 
 
 class BayesMatch(BayesMatchBase):
