@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 with open("README.md") as f:
     readme = f.read()
 
@@ -16,7 +15,7 @@ setup(
     ],
     long_description=readme,
     long_description_content_type="text/markdown",
-    setup_requires=["setuptools>=18.0",],
+    setup_requires=["setuptools>=40.9.0"],
     install_requires=[
         "numpy>=1.17.2",
         "scipy>=1.9.3"
