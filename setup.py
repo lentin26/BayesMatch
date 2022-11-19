@@ -1,7 +1,8 @@
+#!/usr/bin/env python
 with open("README.md") as f:
     readme = f.read()
 
-from setuptools import setup
+from setuptools import setup, find_packages
 
 setup(
     name="BayesMatch",
@@ -20,5 +21,5 @@ setup(
         "numpy>=1.17.2",
         "scipy>=1.9.3"
     ],
-    packages=['BayesMatch']
+    packages=find_packages(include=['BayesMatch', 'BayesMatch.*'])
 )
