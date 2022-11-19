@@ -9,11 +9,9 @@ setup(
     version="0.1.0",
     description='Bayesian multi-view clustering for matching records of two '
                 'different type with share attributes (Maurya and Telang, 2017).',
-    url="",  # TODO
     classifiers=[
         "Intended Audience :: Science/Research",
-        "License :: OSI Approved :: MIT License",
-        "Programming Language :: Python :: 3.6",
+        "Programming Language :: Python :: 3.8.9",
         "Topic :: Scientific/Engineering :: Artificial Intelligence",
     ],
     long_description=readme,
@@ -23,5 +21,5 @@ setup(
         "numpy>=1.17.2",
         "scipy>=1.9.3"
     ],
-    py_modules=['BayesMatch']
+    packages=['BayesMatch']
 )
