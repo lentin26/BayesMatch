@@ -35,41 +35,90 @@ class BayesMatchBase:
         self.N_j = len(corpus_jobs)
         self.N_m = len(corpus_members)
 
-        self.n_m_f = self.get_member_feature_count()
-        self.n_j_f = self.get_job_feature_count()
-        self.n_c_f = self.get_common_feature_count()
+        self.Vm = self.get_member_feature_count()
+        self.Vj = self.get_job_feature_count()
+        self.Vc = self.get_common_feature_count()
+
+        self.V = self.n_features()
 
         # initialize count parameters
-        self.members_feature_cluster_assignment = [[0] * len(mem) for mem in corpus_members]
-        self.jobs_feature_cluster_assignment = [[0] * len(job) for job in corpus_jobs]
+        self.members_cluster_assignment = [[0] * len(mem) for mem in corpus_members]
+        self.jobs_cluster_assignment = [[0] * len(job) for job in corpus_jobs]
+
+        self.pos_feature_assignment_m = [np.array([[0] * len(mem) for mem in corpus_members])]*self.K
 
         # feature x by feature v by cluster k
-        self.Vm = self.n_m_f + self.n_c_f
-        self.Vj = self.n_j_f + self.n_c_f
         self.cluster_count_m = np.zeros(self.K)
         self.cluster_count_j = np.zeros(self.K)
-        self.feature_feature_cluster_count_m = np.zeros((self.Vm, self.Vm, self.K,))
-        self.feature_feature_cluster_count_j = np.zeros((self.Vj, self.Vj, self.K))
+
+        # number member-specific, job-specific and common features in each corpus
+        self.nm_tokens = self.get_n_member_tokens()
+        self.nj_tokens = self.get_n_job_tokens()
+        self.nc_tokens = self.get_n_common_tokens()
+
+        self.feature_feature_cluster_count = np.zeros((self.V, self.V, self.K))
+        # self.feature_feature_cluster_count_j = np.zeros((self.V, self.V, self.K))
 
         # set priors
         if isinstance(beta_m, float):
-            self.beta_m = np.array([beta_m])*self.n_m_f
+            self.beta_m = np.array([beta_m])*self.Vm
         if isinstance(beta_j, float):
-            self.beta_j = np.array([beta_j])*self.n_j_f
+            self.beta_j = np.array([beta_j])*self.Vj
         if isinstance(beta_c, float):
-            self.beta_c = np.array([beta_c])*self.n_c_f
+            self.beta_c = np.array([beta_c])*self.Vc
 
         self.log_likelihood_trace = []
         self.perplexity_trace = []
+
+    def n_features(self):
+        """
+        Number of unique features spanning job and member corpuses
+        :return:
+        """
+        nm = len(self.get_member_features())
+        nj = len(self.get_job_features())
+        nc = len(self.get_common_features())
+        return nm + nj + nc
+
+    def get_member_corpus_features(self):
+        """
+        Get distinct member features
+        :return:
+        """
+        return list({x for l in self.corpus_members for x in l})
+
+    def get_job_corpus_features(self):
+        """
+        Get distinct job features
+        :return:
+        """
+        return list({x for l in self.corpus_jobs for x in l})
 
     def get_common_features(self):
         """
         Get distinct common feature indices
         :return:
         """
-        members_feature_idx = self.get_member_features()
-        jobs_feature_idx = self.get_job_features()
-        return np.intersect1d(members_feature_idx, jobs_feature_idx)
+        members_feature_idx = self.get_member_corpus_features()
+        jobs_feature_idx = self.get_job_corpus_features()
+        common_features = np.intersect1d(members_feature_idx, jobs_feature_idx)
+        return np.unique(common_features)
+
+    def get_member_features(self):
+        """
+        Get distinct member features
+        :return:
+        """
+        member_features = self.get_member_corpus_features()
+        return list({x for x in member_features if x not in self.get_common_features()})
+
+    def get_job_features(self):
+        """
+        Get distinct job features
+        :return:
+        """
+        job_features = self.get_job_corpus_features()
+        return list({x for x in job_features if x not in self.get_common_features()})
 
     def get_number_of_tokens(self):
         """
@@ -80,19 +129,52 @@ class BayesMatchBase:
         n_job_tokens = sum(len(l) for l in self.corpus_jobs)
         return n_member_tokens + n_job_tokens
 
-    def get_member_features(self):
+    def get_n_member_tokens(self):
         """
-        Get distinct member features
+        Get number of member_specific tokens
         :return:
         """
-        return list({x for l in self.corpus_members for x in l})
+        # count common tokens from member corpus
+        n_tokens = 0
+        for mem in self.corpus_members:
+            for word in mem:
+                if word in self.member_features:
+                    n_tokens += 1
+        return n_tokens
 
-    def get_job_features(self):
+    def get_n_job_tokens(self):
         """
-        Get distinct job features
+        Get number of member_specific tokens
         :return:
         """
-        return list({x for l in self.corpus_jobs for x in l})
+        n_tokens = 0
+        for mem in self.corpus_jobs:
+            for word in mem:
+                if word in self.job_features:
+                    n_tokens += 1
+        return n_tokens
+
+    def get_n_common_tokens(self):
+        """
+        Get number of common_specific tokens
+        :return:
+        """
+        common_features = self.get_common_features()
+        # count common tokens from member corpus
+        n_tokens_m = 0
+        for mem in self.corpus_members:
+            for word in mem:
+                if word in common_features:
+                    n_tokens_m += 1
+
+        # count common tokens from job corpus
+        n_tokens_j = 0
+        for job in self.corpus_jobs:
+            for word in job:
+                if word in common_features:
+                    n_tokens_j += 1
+
+        return n_tokens_m + n_tokens_j
 
     def get_member_feature_count(self):
         """
@@ -119,67 +201,61 @@ class BayesMatchBase:
         """
         Returns current cluster assignment of feature in member at given position.
         """
-        return self.members_feature_cluster_assignment[member_idx][pos]
+        return self.members_cluster_assignment[member_idx][pos]
 
     def get_cluster_assignment_j(self, job_idx, pos):
         """
         Returns current cluster assignment of feature in member at given position.
         """
-        return self.jobs_feature_cluster_assignment[job_idx][pos]
+        return self.jobs_cluster_assignment[job_idx][pos]
 
     def update_member(self, cluster_idx, member_idx, feature_idx, pos, count):
         """
         Increases or decreases all member count parameters by given count value (+1 or -1).
         :return:
         """
+        # update counts
+        x = self.corpus_members[member_idx]
         self.cluster_count_m[cluster_idx] += count
-
-        # get indices
-        member_features = np.unique(self.corpus_members[member_idx])
-        common_features = np.intersect1d(self.common_features, member_features)
-
-        self.feature_feature_cluster_count_m[member_features, feature_idx, cluster_idx] += count
-        self.feature_feature_cluster_count_j[common_features, feature_idx, cluster_idx] += count
-
-        self.members_feature_cluster_assignment[member_idx][pos] = cluster_idx
+        self.feature_feature_cluster_count[x, feature_idx, cluster_idx] += count
+        self.members_cluster_assignment[member_idx][pos] = cluster_idx
 
     def update_job(self, cluster_idx, job_idx, feature_idx, pos, count):
         """
         Increases or decreases all job count parameters by given count value (+1 or -1).
         :return:
         """
+        # update counts
+        x = self.corpus_jobs[job_idx]
         self.cluster_count_j[cluster_idx] += count
+        self.feature_feature_cluster_count[x, feature_idx, cluster_idx] += count
+        self.jobs_cluster_assignment[job_idx][pos] = cluster_idx
 
-        job_features = np.unique(self.corpus_jobs[job_idx])
-        common_features = np.intersect1d(self.common_features, job_features)
-
-        self.feature_feature_cluster_count_j[job_features, feature_idx, cluster_idx] += count
-        self.feature_feature_cluster_count_m[common_features, feature_idx, cluster_idx] += count
-
-        self.jobs_feature_cluster_assignment[job_idx][pos] = cluster_idx
-
-    def members_full_conditional_posterior(self, member_idx, feature_idx):
+    def members_full_conditional_posterior(self, feature_idx):
         """
         Returns full conditional distribution for given job or member index, cluster index and feature_idx.
         Returns multinomial vector for latent variable assignment of a member, which should sum to 1
         :return
         """
-        # number of times member with feature x equal to u assigned to k
-        n_mf_k = self.feature_feature_cluster_count_m[:, feature_idx, :]
+        # count of member assignments
+        m = self.cluster_count_m
+        member_assignments = m + self.alpha
+
         # total number of times members with feature x equal to v were assigned to k
-        n_m_k = self.feature_feature_cluster_count_m[:, :, :]
+        n_mf_k = self.feature_feature_cluster_count[self.member_features, feature_idx, :]
+        # number of times member with feature x equal to u assigned to k
+        n_m_k = self.feature_feature_cluster_count[self.member_features, feature_idx, :].sum(axis=0)
+        # total number of times members with feature x equal to v were assigned to k
+        n_cf_k = self.feature_feature_cluster_count[self.common_features, feature_idx, :]
+        # number of times member with feature x equal to u assigned to k
+        n_c_k = self.feature_feature_cluster_count[self.common_features, feature_idx, :].sum(axis=0)
 
-        # compute products or ratios iteratively
-        ratio = 1
-        assignments = self.cluster_count_m + self.alpha
-        for mem in self.corpus_members:
-            for x in mem:
-                ratio *= (n_mf_k[x, :] + self.beta_m) / (n_m_k[x, :, :].sum(axis=0) + self.Vm * self.beta_m)
-                # normalize ratio
-                ratio = ratio/ratio.sum()
+        # ratio of x, v assigned to k vs x assigned to k
+        member_ratio = (n_mf_k + self.beta_m) / (n_m_k + self.Vm * self.beta_m)
+        common_ratio = (n_cf_k + self.beta_m) / (n_c_k + self.Vm * self.beta_m)
 
-        # return normalized latent assignment vector
-        p_z_cond = assignments * np.exp(ratio)
+        # non-normalized conditional probability
+        p_z_cond = member_assignments * member_ratio.prod(axis=0) * common_ratio.prod(axis=0)
         return p_z_cond / p_z_cond.sum()
 
     def jobs_full_conditional_posterior(self, feature_idx):
@@ -188,24 +264,25 @@ class BayesMatchBase:
         Returns multinomial vector for latent variable assignment of a member, which should sum to 1
         :return
         """
+        # count of cluster assignments
+        m = self.cluster_count_j
+        assignments = m + self.alpha
+
         # number of times member with feature x equal to u assigned to k
-        n_mf_k = self.feature_feature_cluster_count_m[:, feature_idx, :]
+        n_mf_k = self.feature_feature_cluster_count[self.job_features, feature_idx, :]
         # total number of times members with feature x equal to v were assigned to k
-        n_m_k = self.feature_feature_cluster_count_m
-
-        # compute products or ratios iteratively
-        ratio = 1
-        for job in self.corpus_members:
-            for x in job:
-                ratio *= (n_mf_k[x] + self.beta_m) / (n_m_k[x, :, :].sum(axis=0) + self.Vj*self.beta_m)
-                # normalize ratio
-                ratio = ratio / ratio.sum()
-
-        # member assignment counts
-        assignments = self.cluster_count_j + self.alpha
+        n_m_k = self.feature_feature_cluster_count[self.job_features, feature_idx, :].sum(axis=0)
+        # number of times member with feature x equal to u assigned to k
+        n_cf_k = self.feature_feature_cluster_count[self.common_features, feature_idx, :]
+        # total number of times members with feature x equal to v were assigned to k
+        n_c_k = self.feature_feature_cluster_count[self.common_features, feature_idx, :].sum(axis=0)
 
         # un-normalized conditional prob
-        p_z_cond = assignments * ratio
+        job_ratio = (n_mf_k + self.beta_j) / (n_m_k + self.Vj * self.beta_j)
+        common_ratio = (n_cf_k + self.beta_j) / (n_c_k + self.Vj * self.beta_j)
+
+        # product of ratios
+        p_z_cond = assignments * job_ratio.prod(axis=0) * common_ratio.prod(axis=0)
         return p_z_cond / p_z_cond.sum()
 
     def get_log_likelihood(self):
@@ -218,26 +295,29 @@ class BayesMatchBase:
         log_likelihood = 0.0
         for z in range(self.K):  # log p(fm|z)
             # members
-            log_likelihood += gammaln(self.alpha.sum())
-            log_likelihood -= gammaln(self.alpha).sum()
+            log_likelihood += 2*gammaln(self.alpha.sum())
+            log_likelihood -= 2*gammaln(self.alpha).sum()
             log_likelihood += gammaln(self.cluster_count_m + self.alpha).sum()
             log_likelihood -= gammaln((self.cluster_count_m + self.alpha).sum())
             log_likelihood += gammaln(self.cluster_count_j + self.alpha).sum()
             log_likelihood -= gammaln((self.cluster_count_j + self.alpha).sum())
-        for v in range(self.Vm):
-            log_likelihood += gammaln(self.beta_m.sum())
-            log_likelihood -= gammaln(self.beta_m).sum()
-            log_likelihood += gammaln(self.beta_c.sum())
-            log_likelihood -= gammaln(self.beta_c).sum()
-            log_likelihood += gammaln(self.beta_j.sum())
-            log_likelihood -= gammaln(self.beta_j).sum()
+        # for v in range(self.Vm):
+        #     log_likelihood += gammaln(self.beta_m.sum())
+        #     log_likelihood -= gammaln(self.beta_m).sum()
+        #     log_likelihood += gammaln(self.beta_c.sum())
+        #     log_likelihood -= gammaln(self.beta_c).sum()
+        # for v in range(self.Vc):
+        #     log_likelihood += gammaln(self.beta_j.sum())
+        #     log_likelihood -= gammaln(self.beta_j).sum()
+        #     log_likelihood += gammaln(self.beta_c.sum())
+        #     log_likelihood -= gammaln(self.beta_c).sum()
         for z in range(self.K):
-            for x in range(self.get_member_feature_count()):
-                log_likelihood += gammaln(self.feature_feature_cluster_count_m[x, :, z] + self.beta_m).sum()
-                log_likelihood -= gammaln((self.feature_feature_cluster_count_m[x, :, z] + self.beta_m).sum())
-            for x in range(self.get_job_feature_count()):
-                log_likelihood += gammaln(self.feature_feature_cluster_count_j[x, :, z] + self.beta_m).sum()
-                log_likelihood -= gammaln((self.feature_feature_cluster_count_j[x, :, z] + self.beta_m).sum())
+            for x in self.get_member_features():
+                log_likelihood += gammaln(self.feature_feature_cluster_count[x, :, z] + self.beta_m).sum()
+                log_likelihood -= gammaln((self.feature_feature_cluster_count[x, :, z] + self.beta_m).sum())
+            for x in self.get_job_features():
+                log_likelihood += gammaln(self.feature_feature_cluster_count[x, :, z] + self.beta_m).sum()
+                log_likelihood -= gammaln((self.feature_feature_cluster_count[x, :, z] + self.beta_m).sum())
         return log_likelihood
 
     def trace_metrics(self):

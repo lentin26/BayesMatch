@@ -1,5 +1,5 @@
 import numpy as np
-from numpy.random import multinomial, randint
+from numpy.random import multinomial, randint, choice
 from scipy.special import psi
 from BayesMatchBase import BayesMatchBase
 
@@ -41,11 +41,13 @@ class BayesMatch(BayesMatchBase):
         """
         Initializes all BayesMatch variables at random.
         """
+        # initialize member counts
         for member_idx, mem in enumerate(self.corpus_members):
             for pos, feature_idx in enumerate(mem):
                 new_cluster_idx = randint(self.K)
                 self.update_member(new_cluster_idx, member_idx, feature_idx, pos, 1)
 
+        # initialize job counts
         for job_idx, job in enumerate(self.corpus_jobs):
             for pos, feature_idx in enumerate(job):
                 new_cluster_idx = randint(self.K)
@@ -64,7 +66,7 @@ class BayesMatch(BayesMatchBase):
                 # decrement all corpus statistics by one
                 self.update_member(cluster_idx, member_idx, feature_idx, pos, -1)
                 # compute full conditional posterior vector
-                probs = self.members_full_conditional_posterior(member_idx, feature_idx)
+                probs = self.members_full_conditional_posterior(feature_idx)
                 # sample new cluster_idx, returns index of vector of all 0s and one 1
                 new_cluster_idx = multinomial(1, probs).argmax()
                 # increment all corpus statistics by on
@@ -86,7 +88,7 @@ class BayesMatch(BayesMatchBase):
                 probs = self.jobs_full_conditional_posterior(feature_idx)
                 # sample new cluster_idx, returns index of vector of all 0s and one 1
                 new_cluster_idx = multinomial(1, probs).argmax()
-                # increment all corpus statistics by on
+                # increment all corpus statistics by one
                 self.update_job(new_cluster_idx, job_idx, feature_idx, pos, 1)
 
     def fit(self, optimize_priors=False):
