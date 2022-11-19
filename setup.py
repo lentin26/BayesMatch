@@ -5,5 +5,4 @@ setup(
     description='Bayesian multi-view clustering for matching records of two '
                 'different type with share attributes (Maurya and Telang, 2017).',
     packages=['BayesMatch'],
-    long_description=open('README.txt').read(),
 )
