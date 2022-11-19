@@ -122,27 +122,27 @@ class BayesMatch(BayesMatchBase):
                 print("iteration %i" % iteration)
 
 
-if __name__ == '__main__':
-
-    # generate random dataset
-    n = 50
-    cj = np.random.randint(0, 10, size=1000).reshape(200, 5)
-    cm = np.random.randint(5, 15, size=1000).reshape(200, 5)
-
-    # initialize matching algorithm
-    match = BayesMatch(
-        corpus_jobs=cj,
-        corpus_members=cm,
-        K=10,
-        alpha=np.array([1]),
-        burnin=0,
-        samples=100,
-        interval=1,
-        eval_every=1
-    )
-
-    match.fit()
-    match.plot_metrics()
+# if __name__ == '__main__':
+#
+#     # generate random dataset
+#     n = 50
+#     cj = np.random.randint(0, 10, size=1000).reshape(200, 5)
+#     cm = np.random.randint(5, 15, size=1000).reshape(200, 5)
+#
+#     # initialize matching algorithm
+#     match = BayesMatch(
+#         corpus_jobs=cj,
+#         corpus_members=cm,
+#         K=10,
+#         alpha=np.array([1]),
+#         burnin=0,
+#         samples=100,
+#         interval=1,
+#         eval_every=1
+#     )
+#
+#     match.fit()
+#     match.plot_metrics()
 
 
 
